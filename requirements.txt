@@ -9,5 +9,3 @@ dill
 Flask
 opencv-python
 Pillow
-tensorflow-macos
-tensorflow-metal
