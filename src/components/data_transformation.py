@@ -23,7 +23,7 @@ class DataTransformation:
                 'normalize_factor':255.0,
                 'img_size':128,
                 'num_classes':4,
-                'classes':['Closed', 'yawm', 'Open', 'yawn']
+                'classes':['Closed', 'no_yawn', 'Open', 'yawn']
             }
 
             logging.info("Image preprocessing configuration created")
@@ -47,8 +47,8 @@ class DataTransformation:
             preprocessing_obj=self.get_data_transformer_object()
 
             if preprocessing_obj['normalization']:
-                x_train=x_train/preprocessing_obj['normalize_factor']
-                x_test=x_test/preprocessing_obj['normalize_factor']
+                x_train=x_train.astype('float32')/preprocessing_obj['normalize_factor']
+                x_test=x_test.astype('float32')/preprocessing_obj['normalize_factor']
             logging.info("Image normalization compeleted")
 
             num_classes=preprocessing_obj['num_classes']
