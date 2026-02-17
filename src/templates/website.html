@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Drowsiness Detection System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            border-radius: 24px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1), 0 2px 8px rgba(255, 255, 255, 0.1) inset;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 40px;
+            max-width: 900px;
+            width: 100%;
+            animation: slideIn 0.5s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to{
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        h1 {
+            color: white;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .subtitle {
+            color: rgba(255, 255, 255, 0.9);
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+
+        .camera-section {
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 16px;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .video-container {
+            position: relative;
+            display: inline-block;
+            margin-bottom: 20px;
+        }
+        #video {
+            width: 100%;
+            max-width: 640px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            display: none;
+        }
+
+        #overlayCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            display: none;
+            pointer-events: none;
+        }
+
+        #canvas {
+            display: none;
+        }
+
+        .controls {
+            margin: 20px 0;
+        }
+
+        .btn {
+            padding: 15px 40px;
+            margin: 10px;
+            border: none;
+            border-radius: 12px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-start {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+        }
+
+        .btn-stop {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            display: none;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .result-box {
+            margin-top: 20px;
+            padding: 25px;
+            border-radius: 12px;
+            font-size: 1.5em;
+            font-weight: bold;
+            display: none;
+            animation: pulse 0.5s ease-out;
+        }
+
+        @keyframes pulse {
+            0%, 100% {transform: scale(1); }
+            50% {transform: scale(1.05); }
+        }
+
+        .alert {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            animation: alertFlash 0.5s infinite;
+        }
+
+        @keyframes alertFlash {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+       .safe {
+        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        color: white;
+       }
+
+       .status-indicator {
+        display: inline-block;
+        width: 15px;
+        height: 15px;
+        border-radius: 50%;
+        margin-right: 10px;
+        animation: blink 1s infinite;
+       }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        .probabilities {
+            margin-top: 20px;
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            display: none;
+        }
+
+        .probabilities h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+            text-align: left;
+        }
+
+        .prob-item {
+            margin-bottom: 15px;
+            text-align: left;
+        }
+
+        .class-name {
+            display: block;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .prob-value {
+            float: right;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .prob-bar {
+            background: #e9ecef;
+            height: 12px;
+            border-radius: 6px;
+            overflow: hidden;
+            clear: both;
+        }
+
+        .prob-fill {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100%;
+            transition: width 0.5s ease;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .spinner {
+            border: 4px solid rgba(102, 126, 234, 0.3);
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .face-status {
+            color: #667eea;
+            font-size: 0.9em;
+            margin-top: 10px;
+            min-height: 20px;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 20px;
+            }
+            h1 {
+                font-size: 2em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Drowsiness Detector</h1>
+        <p class="subtitle">Real-time drowsiness monitoring with facial recognition</p>
+
+        <div class="camera-section">
+            <div class="video-container">
+                <video id="video" autoplay playsinline></video>
+                <canvas id="overlayCanvas"></canvas>
+            </div>
+            <canvas id="canvas"></canvas>
+
+            <p class="face-status" id="faceStatus">Ready to start</p>
+
+            <div class="controls">
+                <button class="btn btn-start" id="startBtn" onclick="startCamera()">
+                    Start Detection
+                </button>
+                <button class="btn btn-stop" id="stopBtn" onclick="stopCamera()">
+                    Stop Detection
+                </button>
+            </div>
+
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p style="color: #667eea; margin-top: 10px;">Analyzing...</p>
+            </div>
+
+            <div class="result-box" id="resultBox">
+                <span class="status-indicator"></span>
+                <span id="statusText">Monitoring...</span>
+            </div>
+
+            <div class="probabilities" id="probabilities">
+                <h3>Detection Confidence</h3>
+                <div id="probContent"></div>
+            </div>
+        </div>
+    </div>
+
+    <audio id="alertSound" preload="auto">
+        <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIGGG37emnUhIMTKPn77BiFgo=" type="audio/wav">
+    </audio>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_detection"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils"></script>
+
+    <script>
+        let video = document.getElementById('video');
+        let canvas = document.getElementById('canvas');
+        let overlayCanvas = document.getElementById('overlayCanvas');
+        let ctx = canvas.getContext('2d');
+        let overlayCtx = overlayCanvas.getContext('2d');
+        let stream = null;
+        let intervalId = null;
+        let alertSound = document.getElementById('alertSound');
+        let isAlerting = false;
+        let faceDetection = null;
+        let lastFaceDetection = null;
+
+        async function initializeFaceDetection() {
+            const faceDetectionModule = window.FaceDetection;
+            faceDetection=new faceDetectionModule.FaceDetection({
+                locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/${file}`
+            });
+
+            faceDetection.setOptions({
+                model: 'short',
+                minDetectionConfidence: 0.5
+            });
+
+            faceDetection.onResults(onFaceDetectionResults);
+        }
+
+        function onFaceDetectionResults(results) {
+            if (results.detections && results.detections.length >0) {
+                lastFaceDetection= results.detections[0];
+                document.getElementById('faceStatus').textContent = '✓ Face detected';
+                document.getElementById('faceStatus').style.color = '#4facfe';
+
+                drawFaceBox(results.detections[0]);
+            } else {
+                lastFaceDetection=null;
+                document.getElementById('faceStatus').textContent = '⚠ No face detected';
+                document.getElementById('faceStatus').style.color = '#f5576c';
+                
+                clearOverlay();
+            }
+        }
+
+        function drawFaceBox(detection) {
+            const bbox=detection.boundingBox;
+            overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+
+            const x = bbox.xCenter * overlayCanvas.width - (bbox.width * overlayCanvas.width) / 2;
+            const y = bbox.yCenter * overlayCanvas.height - (bbox.height * overlayCanvas.height) / 2;
+            const width = bbox.width * overlayCanvas.width;
+            const height = bbox.height * overlayCanvas.height;
+            
+            overlayCtx.strokeStyle = '#4facfe';
+            overlayCtx.lineWidth = 3;
+            overlayCtx.strokeRect(x, y, width, height);
+        }
+
+        function clearOverlay() {
+            overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height)
+        }
+
+        async function startCamera() {
+            try {
+ 
+                if (!faceDetection) {
+                    await initializeFaceDetection();
+                }
+
+                stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        width: 640, 
+                        height: 480,
+                        facingMode: 'user'
+                    } 
+                });
+                video.srcObject = stream;
+                
+                video.onloadedmetadata = () => {
+                    video.style.display = 'block';
+                    overlayCanvas.style.display = 'block';
+                    overlayCanvas.width = video.videoWidth;
+                    overlayCanvas.height = video.videoHeight;
+                };
+                
+                document.getElementById('startBtn').style.display = 'none';
+                document.getElementById('stopBtn').style.display = 'inline-block';
+                document.getElementById('resultBox').style.display = 'block';
+                document.getElementById('probabilities').style.display = 'block';
+
+                intervalId = setInterval(captureAndPredict, 1500);
+            } catch (err) {
+                alert('❌ Camera access denied: ' + err.message);
+            }
+        }
+
+        function stopCamera() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                video.srcObject = null;
+                video.style.display = 'none';
+                overlayCanvas.style.display = 'none';
+            }
+            
+            if (intervalId) {
+                clearInterval(intervalId);
+            }
+
+            alertSound.pause();
+            alertSound.currentTime = 0;
+            isAlerting = false;
+
+            document.getElementById('startBtn').style.display = 'inline-block';
+            document.getElementById('stopBtn').style.display = 'none';
+            document.getElementById('resultBox').style.display = 'none';
+            document.getElementById('probabilities').style.display = 'none';
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('faceStatus').textContent = 'Ready to start';
+            document.getElementById('faceStatus').style.color = '#667eea';
+        }
+
+        async function captureAndPredict() {
+            await faceDetection.send({image: video});
+
+            if (!lastFaceDetection) {
+                return;
+            }
+
+            document.getElementById('loading').style.display = 'block';
+
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0);
+            
+            const bbox = lastFaceDetection.boundingBox;
+            const x = Math.max(0, bbox.xCenter * canvas.width - (bbox.width * canvas.width) / 2);
+            const y = Math.max(0, bbox.yCenter * canvas.height - (bbox.height * canvas.height) / 2);
+            const width = Math.min(bbox.width * canvas.width, canvas.width - x);
+            const height = Math.min(bbox.height * canvas.height, canvas.height - y);
+            
+            const croppedCanvas = document.createElement('canvas');
+            const croppedCtx = croppedCanvas.getContext('2d');
+            croppedCanvas.width = width;
+            croppedCanvas.height = height;
+            croppedCtx.drawImage(canvas, x, y, width, height, 0, 0, width, height);
+            
+            croppedCanvas.toBlob(async (blob) => {
+                const formData = new FormData();
+                formData.append('file', blob, 'face.jpg');
+
+                try {
+                    const response = await fetch('/predict', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const result = await response.json();
+                    
+                    document.getElementById('loading').style.display = 'none';
+                    updateResult(result.prediction, result.probabilities);
+                } catch (error) {
+                    console.error('Prediction error:', error);
+                    document.getElementById('loading').style.display = 'none';
+                }
+            }, 'image/jpeg', 0.9);
+        }
+
+        function updateResult(prediction, probabilities) {
+            const resultBox = document.getElementById('resultBox');
+            const statusText = document.getElementById('statusText');
+            const probContent = document.getElementById('probContent');
+
+            const isDrowsy = (prediction === 'Closed' || prediction === 'yawn');
+
+            if (isDrowsy) {
+                resultBox.className = 'result-box alert';
+                statusText.textContent = `⚠️ ${prediction.toUpperCase()} DETECTED!`;
+                
+                if (!isAlerting) {
+                    playAlert();
+                }
+            } else {
+                resultBox.className = 'result-box safe';
+                statusText.textContent = `✅ ${prediction.toUpperCase()} - Driver Alert`;
+                
+                if (isAlerting) {
+                    stopAlert();
+                }
+            }
+
+            let probHTML = '';
+            for (const [className, prob] of Object.entries(probabilities)) {
+                const percentage = prob.replace('%', '');
+                probHTML += `
+                    <div class="prob-item">
+                        <span class="class-name">${className}</span>
+                        <span class="prob-value">${prob}</span>
+                        <div class="prob-bar">
+                            <div class="prob-fill" style="width: ${percentage}%"></div>
+                        </div>
+                    </div>
+                `;
+            }
+            probContent.innerHTML = probHTML;
+        }
+
+        function playAlert() {
+            isAlerting = true;
+            alertSound.loop = true;
+            alertSound.play().catch(e => console.log('Audio play error:', e));
+        }
+
+        function stopAlert() {
+            isAlerting = false;
+            alertSound.pause();
+            alertSound.currentTime = 0;
+        }
+
+        window.addEventListener('beforeunload', () => {
+            stopCamera();
+        });
+    </script>
+</body>
+</html>
