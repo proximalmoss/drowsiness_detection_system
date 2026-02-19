@@ -298,229 +298,158 @@
     <audio id="alertSound" preload="auto">
         <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIGGG37emnUhIMTKPn77BiFgo=" type="audio/wav">
     </audio>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_detection"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils"></script>
-
+    
     <script>
         let video = document.getElementById('video');
-        let canvas = document.getElementById('canvas');
-        let overlayCanvas = document.getElementById('overlayCanvas');
-        let ctx = canvas.getContext('2d');
-        let overlayCtx = overlayCanvas.getContext('2d');
-        let stream = null;
-        let intervalId = null;
-        let alertSound = document.getElementById('alertSound');
-        let isAlerting = false;
-        let faceDetection = null;
-        let lastFaceDetection = null;
+    let canvas = document.getElementById('canvas');
+    let ctx = canvas.getContext('2d');
+    let stream = null;
+    let intervalId = null;
+    let alertSound = document.getElementById('alertSound');
+    let isAlerting = false;
 
-        async function initializeFaceDetection() {
-            const faceDetectionModule = window.FaceDetection;
-            faceDetection=new faceDetectionModule.FaceDetection({
-                locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/${file}`
+    async function startCamera() {
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { 
+                    width: 640, 
+                    height: 480,
+                    facingMode: 'user'
+                } 
             });
-
-            faceDetection.setOptions({
-                model: 'short',
-                minDetectionConfidence: 0.5
-            });
-
-            faceDetection.onResults(onFaceDetectionResults);
-        }
-
-        function onFaceDetectionResults(results) {
-            if (results.detections && results.detections.length >0) {
-                lastFaceDetection= results.detections[0];
-                document.getElementById('faceStatus').textContent = '✓ Face detected';
-                document.getElementById('faceStatus').style.color = '#4facfe';
-
-                drawFaceBox(results.detections[0]);
-            } else {
-                lastFaceDetection=null;
-                document.getElementById('faceStatus').textContent = '⚠ No face detected';
-                document.getElementById('faceStatus').style.color = '#f5576c';
-                
-                clearOverlay();
-            }
-        }
-
-        function drawFaceBox(detection) {
-            const bbox=detection.boundingBox;
-            overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
-
-            const x = bbox.xCenter * overlayCanvas.width - (bbox.width * overlayCanvas.width) / 2;
-            const y = bbox.yCenter * overlayCanvas.height - (bbox.height * overlayCanvas.height) / 2;
-            const width = bbox.width * overlayCanvas.width;
-            const height = bbox.height * overlayCanvas.height;
+            video.srcObject = stream;
+            video.style.display = 'block';
             
-            overlayCtx.strokeStyle = '#4facfe';
-            overlayCtx.lineWidth = 3;
-            overlayCtx.strokeRect(x, y, width, height);
+            document.getElementById('startBtn').style.display = 'none';
+            document.getElementById('stopBtn').style.display = 'inline-block';
+            document.getElementById('resultBox').style.display = 'block';
+            document.getElementById('probabilities').style.display = 'block';
+            document.getElementById('faceStatus').textContent = '✓ Camera active';
+            document.getElementById('faceStatus').style.color = '#4facfe';
+
+            intervalId = setInterval(captureAndPredict, 1500);
+        } catch (err) {
+            alert('❌ Camera access denied: ' + err.message);
+        }
+    }
+
+    function stopCamera() {
+        if (stream) {
+            stream.getTracks().forEach(track => track.stop());
+            video.srcObject = null;
+            video.style.display = 'none';
+        }
+        
+        if (intervalId) {
+            clearInterval(intervalId);
         }
 
-        function clearOverlay() {
-            overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height)
-        }
+        alertSound.pause();
+        alertSound.currentTime = 0;
+        isAlerting = false;
 
-        async function startCamera() {
+        document.getElementById('startBtn').style.display = 'inline-block';
+        document.getElementById('stopBtn').style.display = 'none';
+        document.getElementById('resultBox').style.display = 'none';
+        document.getElementById('probabilities').style.display = 'none';
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('faceStatus').textContent = 'Ready to start';
+        document.getElementById('faceStatus').style.color = '#667eea';
+    }
+
+    async function captureAndPredict() {
+        document.getElementById('loading').style.display = 'block';
+
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0);
+        
+        // Crop center region (assumes face is centered)
+        const cropSize = Math.min(canvas.width, canvas.height) * 0.7;
+        const x = (canvas.width - cropSize) / 2;
+        const y = (canvas.height - cropSize) / 2;
+        
+        const croppedCanvas = document.createElement('canvas');
+        const croppedCtx = croppedCanvas.getContext('2d');
+        croppedCanvas.width = cropSize;
+        croppedCanvas.height = cropSize;
+        croppedCtx.drawImage(canvas, x, y, cropSize, cropSize, 0, 0, cropSize, cropSize);
+        
+        croppedCanvas.toBlob(async (blob) => {
+            const formData = new FormData();
+            formData.append('file', blob, 'frame.jpg');
+
             try {
- 
-                if (!faceDetection) {
-                    await initializeFaceDetection();
-                }
-
-                stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { 
-                        width: 640, 
-                        height: 480,
-                        facingMode: 'user'
-                    } 
+                const response = await fetch('/predict', {
+                    method: 'POST',
+                    body: formData
                 });
-                video.srcObject = stream;
-                
-                video.onloadedmetadata = () => {
-                    video.style.display = 'block';
-                    overlayCanvas.style.display = 'block';
-                    overlayCanvas.width = video.videoWidth;
-                    overlayCanvas.height = video.videoHeight;
-                };
-                
-                document.getElementById('startBtn').style.display = 'none';
-                document.getElementById('stopBtn').style.display = 'inline-block';
-                document.getElementById('resultBox').style.display = 'block';
-                document.getElementById('probabilities').style.display = 'block';
 
-                intervalId = setInterval(captureAndPredict, 1500);
-            } catch (err) {
-                alert('❌ Camera access denied: ' + err.message);
+                const result = await response.json();
+                
+                document.getElementById('loading').style.display = 'none';
+                updateResult(result.prediction, result.probabilities);
+            } catch (error) {
+                console.error('Prediction error:', error);
+                document.getElementById('loading').style.display = 'none';
+            }
+        }, 'image/jpeg', 0.9);
+    }
+
+    function updateResult(prediction, probabilities) {
+        const resultBox = document.getElementById('resultBox');
+        const statusText = document.getElementById('statusText');
+        const probContent = document.getElementById('probContent');
+
+        const isDrowsy = (prediction === 'Closed' || prediction === 'yawn');
+
+        if (isDrowsy) {
+            resultBox.className = 'result-box alert';
+            statusText.textContent = `⚠️ ${prediction.toUpperCase()} DETECTED!`;
+            
+            if (!isAlerting) {
+                playAlert();
+            }
+        } else {
+            resultBox.className = 'result-box safe';
+            statusText.textContent = `✅ ${prediction.toUpperCase()} - Driver Alert`;
+            
+            if (isAlerting) {
+                stopAlert();
             }
         }
 
-        function stopCamera() {
-            if (stream) {
-                stream.getTracks().forEach(track => track.stop());
-                video.srcObject = null;
-                video.style.display = 'none';
-                overlayCanvas.style.display = 'none';
-            }
-            
-            if (intervalId) {
-                clearInterval(intervalId);
-            }
-
-            alertSound.pause();
-            alertSound.currentTime = 0;
-            isAlerting = false;
-
-            document.getElementById('startBtn').style.display = 'inline-block';
-            document.getElementById('stopBtn').style.display = 'none';
-            document.getElementById('resultBox').style.display = 'none';
-            document.getElementById('probabilities').style.display = 'none';
-            document.getElementById('loading').style.display = 'none';
-            document.getElementById('faceStatus').textContent = 'Ready to start';
-            document.getElementById('faceStatus').style.color = '#667eea';
-        }
-
-        async function captureAndPredict() {
-            await faceDetection.send({image: video});
-
-            if (!lastFaceDetection) {
-                return;
-            }
-
-            document.getElementById('loading').style.display = 'block';
-
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            ctx.drawImage(video, 0, 0);
-            
-            const bbox = lastFaceDetection.boundingBox;
-            const x = Math.max(0, bbox.xCenter * canvas.width - (bbox.width * canvas.width) / 2);
-            const y = Math.max(0, bbox.yCenter * canvas.height - (bbox.height * canvas.height) / 2);
-            const width = Math.min(bbox.width * canvas.width, canvas.width - x);
-            const height = Math.min(bbox.height * canvas.height, canvas.height - y);
-            
-            const croppedCanvas = document.createElement('canvas');
-            const croppedCtx = croppedCanvas.getContext('2d');
-            croppedCanvas.width = width;
-            croppedCanvas.height = height;
-            croppedCtx.drawImage(canvas, x, y, width, height, 0, 0, width, height);
-            
-            croppedCanvas.toBlob(async (blob) => {
-                const formData = new FormData();
-                formData.append('file', blob, 'face.jpg');
-
-                try {
-                    const response = await fetch('/predict', {
-                        method: 'POST',
-                        body: formData
-                    });
-
-                    const result = await response.json();
-                    
-                    document.getElementById('loading').style.display = 'none';
-                    updateResult(result.prediction, result.probabilities);
-                } catch (error) {
-                    console.error('Prediction error:', error);
-                    document.getElementById('loading').style.display = 'none';
-                }
-            }, 'image/jpeg', 0.9);
-        }
-
-        function updateResult(prediction, probabilities) {
-            const resultBox = document.getElementById('resultBox');
-            const statusText = document.getElementById('statusText');
-            const probContent = document.getElementById('probContent');
-
-            const isDrowsy = (prediction === 'Closed' || prediction === 'yawn');
-
-            if (isDrowsy) {
-                resultBox.className = 'result-box alert';
-                statusText.textContent = `⚠️ ${prediction.toUpperCase()} DETECTED!`;
-                
-                if (!isAlerting) {
-                    playAlert();
-                }
-            } else {
-                resultBox.className = 'result-box safe';
-                statusText.textContent = `✅ ${prediction.toUpperCase()} - Driver Alert`;
-                
-                if (isAlerting) {
-                    stopAlert();
-                }
-            }
-
-            let probHTML = '';
-            for (const [className, prob] of Object.entries(probabilities)) {
-                const percentage = prob.replace('%', '');
-                probHTML += `
-                    <div class="prob-item">
-                        <span class="class-name">${className}</span>
-                        <span class="prob-value">${prob}</span>
-                        <div class="prob-bar">
-                            <div class="prob-fill" style="width: ${percentage}%"></div>
-                        </div>
+        let probHTML = '';
+        for (const [className, prob] of Object.entries(probabilities)) {
+            const percentage = prob.replace('%', '');
+            probHTML += `
+                <div class="prob-item">
+                    <span class="class-name">${className}</span>
+                    <span class="prob-value">${prob}</span>
+                    <div class="prob-bar">
+                        <div class="prob-fill" style="width: ${percentage}%"></div>
                     </div>
-                `;
-            }
-            probContent.innerHTML = probHTML;
+                </div>
+            `;
         }
+        probContent.innerHTML = probHTML;
+    }
 
-        function playAlert() {
-            isAlerting = true;
-            alertSound.loop = true;
-            alertSound.play().catch(e => console.log('Audio play error:', e));
-        }
+    function playAlert() {
+        isAlerting = true;
+        alertSound.loop = true;
+        alertSound.play().catch(e => console.log('Audio play error:', e));
+    }
 
-        function stopAlert() {
-            isAlerting = false;
-            alertSound.pause();
-            alertSound.currentTime = 0;
-        }
+    function stopAlert() {
+        isAlerting = false;
+        alertSound.pause();
+        alertSound.currentTime = 0;
+    }
 
-        window.addEventListener('beforeunload', () => {
-            stopCamera();
-        });
+    window.addEventListener('beforeunload', () => {
+        stopCamera();
+    });
     </script>
 </body>
 </html>
