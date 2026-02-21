@@ -10,17 +10,12 @@ The system monitors facial states (eye closure and yawning) through a webcam and
 ## Table of Contents
 - [Features](#features)
 - [Demo](#demo)
-- [Project Architecture](#project-architecture)
+- [Machine Learning Pipeline](#machine-learning-pipeline)
+- [Tech Stack](#tech-stack)
 - [Dataset](#dataset)
-- [Installation](#installation)
-- [Usage](#usage)
 - [Model Performance](#model-performance)
+- [Architecture (Best Model - Deep CNN)](#architecture-best-model---deep-cnn)
 - [Project Structure](#project-structure)
-- [Technologies Used](#technologies-used)
-- [Future Enhancements](#future-enhancements)
-- [Contributing](#contributing)
-- [License](#license)
-- [Contact](#contact)
 
 ## Features
 
@@ -121,3 +116,4 @@ drowsiness_detection_system/
 │
 └── logs/                          # Application logs
 ```
+
