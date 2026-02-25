@@ -5,7 +5,6 @@ The system monitors facial states (eye closure and yawning) through a webcam and
 ![Python](https://img.shields.io/badge/Python-3.10-blue)
 ![TensorFlow](https://img.shields.io/badge/TensorFlow-2.x-orange)
 ![Flask](https://img.shields.io/badge/Flask-3.0-green)
-![License](https://img.shields.io/badge/License-MIT-yellow)
 
 ## Table of Contents
 - [Features](#features)
@@ -116,4 +115,5 @@ drowsiness_detection_system/
 │
 └── logs/                          # Application logs
 ```
+
 
