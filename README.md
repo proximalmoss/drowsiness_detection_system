@@ -2,10 +2,6 @@
 A real-time driver drowsiness detection system using deep learning and computer vision to prevent road accidents caused by driver fatigue. 
 The system monitors facial states (eye closure and yawning) through a webcam and triggers audio alerts when drowsiness is detected.
 
-![Python](https://img.shields.io/badge/Python-3.10-blue)
-![TensorFlow](https://img.shields.io/badge/TensorFlow-2.x-orange)
-![Flask](https://img.shields.io/badge/Flask-3.0-green)
-
 ## Table of Contents
 - [Features](#features)
 - [Demo](#demo)
@@ -115,5 +111,6 @@ drowsiness_detection_system/
 │
 └── logs/                          # Application logs
 ```
+
 
 
